@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RotateCcw } from 'lucide-react'
+import { Loader2, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useFinance } from '@/lib/finance-store'
 import { CardsPanel } from './cards-panel'
@@ -10,7 +10,7 @@ import { SummaryCards } from './summary-cards'
 import { TrendChart } from './trend-chart'
 
 export function Dashboard() {
-  const { resetToSeed } = useFinance()
+  const { loading, resetToSeed } = useFinance()
   const [confirming, setConfirming] = useState(false)
 
   function handleReset() {
@@ -36,9 +36,7 @@ export function Dashboard() {
             </span>
             <div className="leading-tight">
               <p className="text-sm font-semibold">Axis Finance</p>
-              <p className="text-xs text-muted-foreground">
-                Controle financeiro pessoal
-              </p>
+              <p className="text-xs text-muted-foreground">Controle financeiro pessoal</p>
             </div>
           </div>
 
@@ -47,6 +45,7 @@ export function Dashboard() {
               variant="ghost"
               size="sm"
               onClick={handleReset}
+              disabled={loading}
               className={
                 confirming
                   ? 'h-8 text-destructive hover:bg-destructive/10 hover:text-destructive'
@@ -64,24 +63,31 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6">
-        <SummaryCards />
-
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-          <div className="flex flex-col gap-4 lg:col-span-2">
-            <TrendChart />
-            <ExpensesPanel />
-          </div>
-          <div className="flex flex-col gap-4">
-            <RevenuesPanel />
-            <CardsPanel />
-          </div>
+      {loading ? (
+        <div className="flex h-[calc(100vh-57px)] items-center justify-center gap-3 text-muted-foreground">
+          <Loader2 className="size-5 animate-spin" />
+          <span className="text-sm">Carregando dados…</span>
         </div>
+      ) : (
+        <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6">
+          <SummaryCards />
 
-        <footer className="pt-2 text-center text-xs text-muted-foreground">
-          Dados salvos automaticamente no navegador · valores em BRL
-        </footer>
-      </main>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="flex flex-col gap-4 lg:col-span-2">
+              <TrendChart />
+              <ExpensesPanel />
+            </div>
+            <div className="flex flex-col gap-4">
+              <RevenuesPanel />
+              <CardsPanel />
+            </div>
+          </div>
+
+          <footer className="pt-2 text-center text-xs text-muted-foreground">
+            Dados salvos no banco de dados · valores em BRL
+          </footer>
+        </main>
+      )}
     </div>
   )
 }
