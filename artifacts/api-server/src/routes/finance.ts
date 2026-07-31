@@ -29,7 +29,7 @@ const SEED_EXPENSES = [
   { id: 'exp-agua', nome: 'Água', valor_base: '150', categoria: 'casa', recorrencia: 'recorrente', parcelas: null, estimado: false, dia_vencimento: 20, cartao_id: null, mes_origem: '2026-01', ativo: true },
   { id: 'exp-alternador', nome: 'Alternador', valor_base: '230', categoria: 'veiculo', recorrencia: 'parcelada', parcelas: 3, estimado: false, dia_vencimento: null, cartao_id: 'card-neon', mes_origem: '2026-06', ativo: true },
   { id: 'exp-anthropic', nome: 'Anthropic', valor_base: '110', categoria: 'assinatura', recorrencia: 'recorrente', parcelas: null, estimado: false, dia_vencimento: null, cartao_id: 'card-nubank', mes_origem: '2026-01', ativo: true },
-  { id: 'exp-gemini', nome: 'API Gemini Axis', valor_base: '50', categoria: 'assinatura', recorrencia: 'recorrente', parcelas: null, estimado: false, dia_vencimento: null, cartao_id: 'card-nubank', mes_origem: '2026-01', ativo: true },
+  { id: 'exp-gemini', nome: 'API Gemini Finance', valor_base: '50', categoria: 'assinatura', recorrencia: 'recorrente', parcelas: null, estimado: false, dia_vencimento: null, cartao_id: 'card-nubank', mes_origem: '2026-01', ativo: true },
   { id: 'exp-casa', nome: 'Casa', valor_base: '577', categoria: 'casa', recorrencia: 'recorrente', parcelas: null, estimado: false, dia_vencimento: 5, cartao_id: null, mes_origem: '2026-01', ativo: true },
   { id: 'exp-emprestimo', nome: 'Empréstimo', valor_base: '172', categoria: 'servicos', recorrencia: 'parcelada', parcelas: 6, estimado: false, dia_vencimento: 8, cartao_id: null, mes_origem: '2026-04', ativo: true },
   { id: 'exp-gasolina', nome: 'Gasolina', valor_base: '800', categoria: 'veiculo', recorrencia: 'recorrente', parcelas: null, estimado: true, dia_vencimento: null, cartao_id: null, mes_origem: '2026-01', ativo: true },
@@ -88,7 +88,7 @@ router.get('/data', async (_req, res) => {
           db.select().from(revenuesTable),
           db.select().from(monthStateTable),
         ])
-      return res.json({
+      res.json({
         cards: seededCards,
         expenses: seededExpenses,
         revenues: seededRevenues,
