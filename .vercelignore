@@ -1,0 +1,7 @@
+.vercel
+.vercel/output
+.vercel/.env*
+artifacts/api-server/public
+**/dist
+artifacts/api-server/index.mjs
+artifacts/api-server/index.mjs.map

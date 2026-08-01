@@ -52,3 +52,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# generated static frontend copied for Vercel deployment
+/artifacts/api-server/public
+.vercel
+/artifacts/api-server/index.mjs
+/artifacts/api-server/index.mjs.map

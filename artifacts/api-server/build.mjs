@@ -28,6 +28,9 @@ async function buildAll() {
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
+      // Keep the express preset able to detect the Express entrypoint from the
+      // bundled output (index.mjs) so Vercel traces express itself.
+      "express",
       "*.node",
       "sharp",
       "better-sqlite3",
