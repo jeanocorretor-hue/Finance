@@ -28,7 +28,12 @@ console.log(`[vercel-build] frontend copiado para ${publicDir}`)
 execSync('node ./build.mjs', { cwd: apiDir, stdio: 'inherit' })
 
 const bundledEntry = path.join(apiDir, 'dist/index.mjs')
-const rootEntry = path.join(apiDir, 'index.mjs')
-cpSync(bundledEntry, rootEntry)
+const apiSubDir = path.join(apiDir, 'api')
+mkdirSync(apiSubDir, { recursive: true })
 
-console.log(`[vercel-build] API bundled para ${rootEntry}`)
+cpSync(bundledEntry, path.join(apiDir, 'index.mjs'))
+cpSync(bundledEntry, path.join(apiDir, 'index.js'))
+cpSync(bundledEntry, path.join(apiSubDir, 'index.js'))
+cpSync(bundledEntry, path.join(apiSubDir, 'index.mjs'))
+
+console.log(`[vercel-build] API bundled para index.mjs, index.js, api/index.js e api/index.mjs`)
