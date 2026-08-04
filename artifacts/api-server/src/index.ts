@@ -2,7 +2,6 @@ import express, { type Express, type Request, type Response, type NextFunction }
 import cors from "cors";
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
 import { pinoHttp } from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
@@ -35,10 +34,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 // Serve static frontend assets from public directory (if built)
-const currentDir =
-  typeof __dirname !== "undefined"
-    ? __dirname
-    : path.dirname(fileURLToPath(import.meta.url));
+const currentDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
 const publicPath = path.join(currentDir, "public");
 
 if (fs.existsSync(publicPath)) {

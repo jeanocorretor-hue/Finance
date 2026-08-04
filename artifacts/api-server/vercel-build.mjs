@@ -27,13 +27,11 @@ console.log(`[vercel-build] frontend copiado para ${publicDir}`)
 // ERR_UNSUPPORTED_DIR_IMPORT.
 execSync('node ./build.mjs', { cwd: apiDir, stdio: 'inherit' })
 
-const bundledEntry = path.join(apiDir, 'dist/index.mjs')
+const bundledEntry = path.join(apiDir, 'dist/index.cjs')
 const apiSubDir = path.join(apiDir, 'api')
 mkdirSync(apiSubDir, { recursive: true })
 
-cpSync(bundledEntry, path.join(apiDir, 'index.mjs'))
 cpSync(bundledEntry, path.join(apiDir, 'index.js'))
 cpSync(bundledEntry, path.join(apiSubDir, 'index.js'))
-cpSync(bundledEntry, path.join(apiSubDir, 'index.mjs'))
 
-console.log(`[vercel-build] API bundled para index.mjs, index.js, api/index.js e api/index.mjs`)
+console.log(`[vercel-build] API CJS bundled para index.js e api/index.js`)
