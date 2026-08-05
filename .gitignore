@@ -56,9 +56,6 @@ Thumbs.db
 # generated static frontend copied for Vercel deployment
 /artifacts/api-server/public
 .vercel
-/artifacts/api-server/index.mjs
-/artifacts/api-server/index.js
-/artifacts/api-server/api
-/artifacts/api-server/index.mjs.map
+.next
 /index.js
 /api

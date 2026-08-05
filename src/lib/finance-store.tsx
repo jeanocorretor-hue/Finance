@@ -124,10 +124,10 @@ function normalizeLogEntry(l: Record<string, unknown>): ExpenseLogEntry {
 const LS_MONTH = 'finance:month'
 
 function readMonthFromStorage(): string {
+  if (typeof window === 'undefined') return '2026-07'
   try {
     const raw = localStorage.getItem(LS_MONTH)
     if (!raw) return '2026-07'
-    // old store wrote JSON.stringify(month), new store writes plain string
     const parsed = JSON.parse(raw)
     if (typeof parsed === 'string' && /^\d{4}-\d{2}$/.test(parsed)) return parsed
     return '2026-07'
@@ -187,7 +187,9 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   // Persist chosen month to localStorage
   const setMonth = useCallback((m: string) => {
     setMonthRaw(m)
-    localStorage.setItem(LS_MONTH, m)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(LS_MONTH, m)
+    }
   }, [])
 
   // ── Load all data from API on mount ───────────────────────────────────────
