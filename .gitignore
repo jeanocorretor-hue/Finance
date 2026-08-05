@@ -60,3 +60,5 @@ Thumbs.db
 /artifacts/api-server/index.js
 /artifacts/api-server/api
 /artifacts/api-server/index.mjs.map
+/index.js
+/api

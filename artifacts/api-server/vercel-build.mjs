@@ -41,9 +41,14 @@ execSync('node ./build.mjs', { cwd: apiDir, stdio: 'inherit' })
 
 const bundledEntry = path.join(apiDir, 'dist/index.cjs')
 const apiSubDir = path.join(apiDir, 'api')
+const rootApiSubDir = path.join(repoRoot, 'api')
+
 mkdirSync(apiSubDir, { recursive: true })
+mkdirSync(rootApiSubDir, { recursive: true })
 
 cpSync(bundledEntry, path.join(apiDir, 'index.js'))
 cpSync(bundledEntry, path.join(apiSubDir, 'index.js'))
+cpSync(bundledEntry, path.join(repoRoot, 'index.js'))
+cpSync(bundledEntry, path.join(rootApiSubDir, 'index.js'))
 
-console.log(`[vercel-build] API CJS bundled para index.js e api/index.js`)
+console.log(`[vercel-build] API CJS bundled para index.js e api/index.js (em api-server e na raiz)`)
