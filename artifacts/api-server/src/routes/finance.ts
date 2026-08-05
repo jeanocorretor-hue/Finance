@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { eq, and } from 'drizzle-orm'
-import { db } from '@workspace/db'
+import { db } from '../db'
 import {
   cardsTable,
   expensesTable,
@@ -8,7 +8,7 @@ import {
   monthStateTable,
   revenueStateTable,
   expenseLogTable,
-} from '@workspace/db'
+} from '../db'
 
 const router = Router()
 
