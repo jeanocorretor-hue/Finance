@@ -31,11 +31,20 @@ try {
   console.warn(`[vercel-build] aviso ao copiar @workspace/db: ${e.message}`)
 }
 
-rmSync(publicDir, { recursive: true, force: true })
-mkdirSync(publicDir, { recursive: true })
-cpSync(financeDist, publicDir, { recursive: true })
+const publicCandidates = [
+  path.join(apiDir, 'public'),
+  path.join(apiDir, 'api/public'),
+  path.join(repoRoot, 'public'),
+  path.join(repoRoot, 'api/public'),
+]
 
-console.log(`[vercel-build] frontend copiado para ${publicDir}`)
+for (const p of publicCandidates) {
+  rmSync(p, { recursive: true, force: true })
+  mkdirSync(p, { recursive: true })
+  cpSync(financeDist, p, { recursive: true })
+}
+
+console.log(`[vercel-build] frontend copiado para todas as pastas public candidatas`)
 
 execSync('node ./build.mjs', { cwd: apiDir, stdio: 'inherit' })
 

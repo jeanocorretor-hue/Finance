@@ -34,8 +34,13 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api", router);
 
 // Serve static frontend assets from public directory (if built)
-const currentDir = typeof __dirname !== "undefined" ? __dirname : process.cwd();
-const publicPath = path.join(currentDir, "public");
+const candidatePaths = [
+  path.join(__dirname, "public"),
+  path.join(__dirname, "../public"),
+  path.join(process.cwd(), "public"),
+  path.join(process.cwd(), "artifacts/api-server/public"),
+];
+const publicPath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
 if (fs.existsSync(publicPath)) {
   app.use(express.static(publicPath));
