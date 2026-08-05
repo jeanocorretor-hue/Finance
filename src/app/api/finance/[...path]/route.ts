@@ -99,7 +99,7 @@ async function handlePost(subPath: string[], req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const pathStr = subPath.join('/');
 
-  if (pathStr === 'reset-seed') {
+  if (pathStr === 'reset-seed' || pathStr === 'reset') {
     await Promise.all([
       db.delete(cardsTable),
       db.delete(expensesTable),
@@ -174,9 +174,9 @@ async function handlePost(subPath: string[], req: NextRequest) {
     return NextResponse.json(revenue);
   }
 
-  if (subPath[0] === 'expenses' && subPath[2] === 'month-state') {
-    const expense_id = subPath[1];
-    const { mes_ref, valor_real, pago } = body;
+  // Flat route: POST /month-state with { expense_id, mes_ref, pago?, valor_real? }
+  if (pathStr === 'month-state') {
+    const { expense_id, mes_ref, valor_real, pago } = body;
     const existing = await db
       .select()
       .from(monthStateTable)
@@ -188,7 +188,7 @@ async function handlePost(subPath: string[], req: NextRequest) {
         .set({
           valor_real: valor_real !== undefined ? (valor_real !== null ? String(valor_real) : null) : existing[0].valor_real,
           pago: pago !== undefined ? pago : existing[0].pago,
-          pago_em: pago ? new Date() : null,
+          pago_em: pago ? new Date() : existing[0].pago_em,
         })
         .where(eq(monthStateTable.id, existing[0].id))
         .returning();
@@ -208,9 +208,9 @@ async function handlePost(subPath: string[], req: NextRequest) {
     return NextResponse.json(created);
   }
 
-  if (subPath[0] === 'revenues' && subPath[2] === 'month-state') {
-    const revenue_id = subPath[1];
-    const { mes_ref, valor_real, recebido } = body;
+  // Flat route: POST /revenue-state with { revenue_id, mes_ref, recebido?, valor_real? }
+  if (pathStr === 'revenue-state') {
+    const { revenue_id, mes_ref, valor_real, recebido } = body;
     const existing = await db
       .select()
       .from(revenueStateTable)
@@ -222,7 +222,7 @@ async function handlePost(subPath: string[], req: NextRequest) {
         .set({
           valor_real: valor_real !== undefined ? (valor_real !== null ? String(valor_real) : null) : existing[0].valor_real,
           recebido: recebido !== undefined ? recebido : existing[0].recebido,
-          recebido_em: recebido ? new Date() : null,
+          recebido_em: recebido ? new Date() : existing[0].recebido_em,
         })
         .where(eq(revenueStateTable.id, existing[0].id))
         .returning();
@@ -242,14 +242,14 @@ async function handlePost(subPath: string[], req: NextRequest) {
     return NextResponse.json(created);
   }
 
-  if (subPath[0] === 'expenses' && subPath[2] === 'log') {
-    const expense_id = subPath[1];
+  // Flat route: POST /expense-log with { expense_id, mes_ref, valor, descricao? }
+  if (pathStr === 'expense-log') {
     const id = uid('log');
     const [entry] = await db
       .insert(expenseLogTable)
       .values({
         id,
-        expense_id,
+        expense_id: body.expense_id,
         mes_ref: body.mes_ref,
         valor: String(body.valor),
         descricao: body.descricao ?? null,
@@ -261,8 +261,79 @@ async function handlePost(subPath: string[], req: NextRequest) {
   return NextResponse.json({ error: 'Endpoint não encontrado' }, { status: 404 });
 }
 
+
 async function handlePut(subPath: string[], req: NextRequest) {
   const body = await req.json().catch(() => ({}));
+  const pathStr = subPath.join('/');
+
+  // Flat route: PUT /month-state with { expense_id, mes_ref, pago?, valor_real? }
+  if (pathStr === 'month-state') {
+    const { expense_id, mes_ref, valor_real, pago } = body;
+    const existing = await db
+      .select()
+      .from(monthStateTable)
+      .where(and(eq(monthStateTable.expense_id, expense_id), eq(monthStateTable.mes_ref, mes_ref)));
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(monthStateTable)
+        .set({
+          valor_real: valor_real !== undefined ? (valor_real !== null ? String(valor_real) : null) : existing[0].valor_real,
+          pago: pago !== undefined ? pago : existing[0].pago,
+          pago_em: pago ? new Date() : existing[0].pago_em,
+        })
+        .where(eq(monthStateTable.id, existing[0].id))
+        .returning();
+      return NextResponse.json(updated);
+    }
+
+    const [created] = await db
+      .insert(monthStateTable)
+      .values({
+        expense_id,
+        mes_ref,
+        valor_real: valor_real !== undefined && valor_real !== null ? String(valor_real) : null,
+        pago: pago ?? false,
+        pago_em: pago ? new Date() : null,
+      })
+      .returning();
+    return NextResponse.json(created);
+  }
+
+  // Flat route: PUT /revenue-state with { revenue_id, mes_ref, recebido?, valor_real? }
+  if (pathStr === 'revenue-state') {
+    const { revenue_id, mes_ref, valor_real, recebido } = body;
+    const existing = await db
+      .select()
+      .from(revenueStateTable)
+      .where(and(eq(revenueStateTable.revenue_id, revenue_id), eq(revenueStateTable.mes_ref, mes_ref)));
+
+    if (existing.length > 0) {
+      const [updated] = await db
+        .update(revenueStateTable)
+        .set({
+          valor_real: valor_real !== undefined ? (valor_real !== null ? String(valor_real) : null) : existing[0].valor_real,
+          recebido: recebido !== undefined ? recebido : existing[0].recebido,
+          recebido_em: recebido ? new Date() : existing[0].recebido_em,
+        })
+        .where(eq(revenueStateTable.id, existing[0].id))
+        .returning();
+      return NextResponse.json(updated);
+    }
+
+    const [created] = await db
+      .insert(revenueStateTable)
+      .values({
+        revenue_id,
+        mes_ref,
+        valor_real: valor_real !== undefined && valor_real !== null ? String(valor_real) : null,
+        recebido: recebido ?? false,
+        recebido_em: recebido ? new Date() : null,
+      })
+      .returning();
+    return NextResponse.json(created);
+  }
+
   if (subPath[0] === 'cards' && subPath[1]) {
     const [card] = await db
       .update(cardsTable)
@@ -313,9 +384,16 @@ async function handlePut(subPath: string[], req: NextRequest) {
   return NextResponse.json({ error: 'Endpoint não encontrado' }, { status: 404 });
 }
 
+
 async function handleDelete(subPath: string[]) {
   if (subPath[0] === 'cards' && subPath[1]) {
     await db.delete(cardsTable).where(eq(cardsTable.id, subPath[1]));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Flat route: DELETE /expense-log/{logId}
+  if (subPath[0] === 'expense-log' && subPath[1]) {
+    await db.delete(expenseLogTable).where(eq(expenseLogTable.id, subPath[1]));
     return NextResponse.json({ ok: true });
   }
 
