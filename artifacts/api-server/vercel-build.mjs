@@ -16,7 +16,12 @@ execSync('pnpm --filter @workspace/finance build', {
   env: { ...process.env, BASE_PATH: '/', NODE_ENV: 'production' },
 })
 
-// Ensure @workspace/db is copied as real physical files inside api-server/node_modules for Vercel NFT tracing
+execSync('pnpm --filter @workspace/db run build', {
+  cwd: repoRoot,
+  stdio: 'inherit',
+})
+
+// Ensure @workspace/db is compiled & copied as real physical files inside api-server/node_modules for Vercel NFT tracing
 try {
   rmSync(targetDb, { recursive: true, force: true })
   mkdirSync(path.dirname(targetDb), { recursive: true })
