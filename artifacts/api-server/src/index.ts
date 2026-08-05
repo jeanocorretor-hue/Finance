@@ -39,7 +39,7 @@ const publicPath = path.join(currentDir, "public");
 
 if (fs.existsSync(publicPath)) {
   app.use(express.static(publicPath));
-  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api")) {
       return next();
     }

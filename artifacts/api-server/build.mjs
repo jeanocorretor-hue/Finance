@@ -106,6 +106,9 @@ async function buildAll() {
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
       esbuildPluginPino({ transports: ["pino-pretty"] })
     ],
+    footer: {
+      js: "if (typeof module !== 'undefined' && module.exports && module.exports.default) { module.exports = module.exports.default; }",
+    },
   });
 }
 
