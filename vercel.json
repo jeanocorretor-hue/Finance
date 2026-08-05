@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "buildCommand": "node ./artifacts/api-server/vercel-build.mjs",
+  "buildCommand": "node vercel-build.mjs || node ./artifacts/api-server/vercel-build.mjs",
   "rewrites": [
     {
       "source": "/(.*)",

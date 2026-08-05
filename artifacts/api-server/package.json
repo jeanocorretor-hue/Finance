@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "node ./build.mjs",
+    "build": "node vercel-build.mjs || node ./artifacts/api-server/vercel-build.mjs || node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
