@@ -32,6 +32,9 @@ export function getPool(): pg.Pool {
       process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
     _pool = new Pool({
       connectionString,
+      max: 1, // Serverless: keep connections minimal for pgBouncer transaction mode
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
       ...(isProduction ? { ssl: { rejectUnauthorized: false } } : {}),
     });
   }
