@@ -1,10 +1,15 @@
 {
   "version": 2,
-  "buildCommand": "node vercel-build.mjs || node ./artifacts/api-server/vercel-build.mjs",
+  "buildCommand": "node ./artifacts/api-server/vercel-build.mjs",
+  "outputDirectory": "artifacts/api-server/public",
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/(.*)",
       "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
