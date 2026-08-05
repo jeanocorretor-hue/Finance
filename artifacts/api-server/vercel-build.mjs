@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { cpSync, mkdirSync, rmSync } from 'node:fs'
+import { cpSync, mkdirSync, rmSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -7,6 +7,8 @@ const apiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)))
 const repoRoot = path.resolve(apiDir, '../..')
 const financeDist = path.join(repoRoot, 'artifacts/finance/dist/public')
 const publicDir = path.join(apiDir, 'public')
+const dbSrc = path.join(repoRoot, 'lib/db')
+const targetDb = path.join(apiDir, 'node_modules/@workspace/db')
 
 execSync('pnpm --filter @workspace/finance build', {
   cwd: repoRoot,
@@ -14,17 +16,22 @@ execSync('pnpm --filter @workspace/finance build', {
   env: { ...process.env, BASE_PATH: '/', NODE_ENV: 'production' },
 })
 
+// Ensure @workspace/db is copied as real physical files inside api-server/node_modules for Vercel NFT tracing
+try {
+  rmSync(targetDb, { recursive: true, force: true })
+  mkdirSync(path.dirname(targetDb), { recursive: true })
+  cpSync(dbSrc, targetDb, { recursive: true })
+  console.log(`[vercel-build] @workspace/db copiado para ${targetDb}`)
+} catch (e) {
+  console.warn(`[vercel-build] aviso ao copiar @workspace/db: ${e.message}`)
+}
+
 rmSync(publicDir, { recursive: true, force: true })
 mkdirSync(publicDir, { recursive: true })
 cpSync(financeDist, publicDir, { recursive: true })
 
 console.log(`[vercel-build] frontend copiado para ${publicDir}`)
 
-// Bundle the API with esbuild into index.mjs so the Express preset picks it up
-// (it is preferred over src/index.ts) and the @workspace/db package (whose
-// exports point to TS source with extension-less directory imports) is resolved
-// correctly at build time instead of failing at runtime with
-// ERR_UNSUPPORTED_DIR_IMPORT.
 execSync('node ./build.mjs', { cwd: apiDir, stdio: 'inherit' })
 
 const bundledEntry = path.join(apiDir, 'dist/index.cjs')
