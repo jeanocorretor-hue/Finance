@@ -1,7 +1,7 @@
 {
   "version": 2,
   "buildCommand": "node ./artifacts/api-server/vercel-build.mjs",
-  "outputDirectory": "public",
+  "outputDirectory": "artifacts/finance/dist/public",
   "rewrites": [
     {
       "source": "/api/(.*)",
