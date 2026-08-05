@@ -1,20 +1,15 @@
 {
   "version": 2,
   "buildCommand": "node ./artifacts/api-server/vercel-build.mjs",
-  "builds": [
+  "outputDirectory": "public",
+  "rewrites": [
     {
-      "src": "api/index.js",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "api/index.js"
+      "source": "/api/(.*)",
+      "destination": "/api/index.js"
     },
     {
-      "src": "/(.*)",
-      "dest": "api/index.js"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ]
 }
