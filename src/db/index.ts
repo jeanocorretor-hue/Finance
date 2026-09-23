@@ -11,7 +11,7 @@ let _supabase: ReturnType<typeof createClient> | null = null;
 
 export function getSupabaseClient() {
   if (!_supabase) {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://clhvmfuyijngheypmxgk.supabase.co";
+    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://xuoqjqmbyryrkjkvlyyg.supabase.co";
     const key = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || "";
     if (url && key) {
       _supabase = createClient(url, key);
@@ -24,9 +24,9 @@ export function getPool(): pg.Pool {
   if (!_pool) {
     let connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
     if (!connectionString) {
-      const projectRef = "clhvmfuyijngheypmxgk";
+      const projectRef = "xuoqjqmbyryrkjkvlyyg";
       const pass = process.env.SUPABASE_DB_PASSWORD || process.env.DB_PASSWORD || "";
-      connectionString = `postgresql://postgres.${projectRef}:${pass}@aws-0-sa-east-1.pooler.supabase.com:6543/postgres`;
+      connectionString = `postgresql://postgres.${projectRef}:${pass}@aws-0-us-east-2.pooler.supabase.com:6543/postgres`;
     }
     const isProduction =
       process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
