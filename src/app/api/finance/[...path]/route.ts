@@ -8,7 +8,14 @@ import {
   monthStateTable,
   revenueStateTable,
   expenseLogTable,
+  pluggyItemsTable,
+  pluggyTransactionsTable,
 } from '@/db';
+import {
+  createPluggyConnectToken,
+  fetchPluggyAccounts,
+  fetchPluggyTransactions,
+} from '@/lib/pluggy';
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -92,12 +99,122 @@ async function handleGet(subPath: string[]) {
     });
   }
 
+  if (endpoint === 'pluggy/token') {
+    try {
+      const connectToken = await createPluggyConnectToken();
+      return NextResponse.json({ connectToken });
+    } catch (err: any) {
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+  }
+
+  if (endpoint === 'pluggy/status') {
+    const items = await db.select().from(pluggyItemsTable);
+    const recentTransactions = await db.select().from(pluggyTransactionsTable).limit(50);
+    return NextResponse.json({
+      configured: !!(process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET),
+      items,
+      recentTransactions,
+    });
+  }
+
   return NextResponse.json({ error: 'Endpoint não encontrado' }, { status: 404 });
 }
 
 async function handlePost(subPath: string[], req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const pathStr = subPath.join('/');
+
+  if (pathStr === 'pluggy/item') {
+    const { itemId, connectorName, connectorId } = body;
+    if (!itemId) {
+      return NextResponse.json({ error: 'itemId é obrigatório' }, { status: 400 });
+    }
+
+    await db
+      .insert(pluggyItemsTable)
+      .values({
+        id: itemId,
+        connector_id: connectorId || null,
+        connector_name: connectorName || 'Banco Conectado',
+        status: 'UPDATED',
+        last_sync_at: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: pluggyItemsTable.id,
+        set: {
+          connector_name: connectorName || 'Banco Conectado',
+          last_sync_at: new Date(),
+          status: 'UPDATED',
+        },
+      });
+
+    try {
+      const accounts = await fetchPluggyAccounts(itemId);
+      for (const acc of accounts) {
+        const transactions = await fetchPluggyTransactions(acc.id);
+        for (const tx of transactions) {
+          await db
+            .insert(pluggyTransactionsTable)
+            .values({
+              id: tx.id,
+              item_id: itemId,
+              account_id: acc.id,
+              description: tx.description || 'Transação sem descrição',
+              amount: String(Math.abs(tx.amount || 0)),
+              date: new Date(tx.date),
+              type: tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT'),
+              category: tx.category || 'Outros',
+            })
+            .onConflictDoNothing();
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao sincronizar transações iniciais:', e);
+    }
+
+    return NextResponse.json({ ok: true, itemId });
+  }
+
+  if (pathStr === 'pluggy/sync') {
+    const items = await db.select().from(pluggyItemsTable);
+    let totalSynced = 0;
+
+    for (const item of items) {
+      try {
+        const accounts = await fetchPluggyAccounts(item.id);
+        for (const acc of accounts) {
+          const transactions = await fetchPluggyTransactions(acc.id);
+          for (const tx of transactions) {
+            await db
+              .insert(pluggyTransactionsTable)
+              .values({
+                id: tx.id,
+                item_id: item.id,
+                account_id: acc.id,
+                description: tx.description || 'Transação sem descrição',
+                amount: String(Math.abs(tx.amount || 0)),
+                date: new Date(tx.date),
+                type: tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT'),
+                category: tx.category || 'Outros',
+              })
+              .onConflictDoNothing();
+            totalSynced++;
+          }
+        }
+        await db
+          .update(pluggyItemsTable)
+          .set({ last_sync_at: new Date(), status: 'UPDATED' })
+          .where(eq(pluggyItemsTable.id, item.id));
+      } catch (err) {
+        console.error(`Erro ao sincronizar item ${item.id}:`, err);
+      }
+    }
+
+    const updatedItems = await db.select().from(pluggyItemsTable);
+    const recentTransactions = await db.select().from(pluggyTransactionsTable).limit(50);
+    return NextResponse.json({ ok: true, totalSynced, items: updatedItems, recentTransactions });
+  }
 
   if (pathStr === 'reset-seed' || pathStr === 'reset') {
     await Promise.all([

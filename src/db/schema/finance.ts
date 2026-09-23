@@ -106,3 +106,35 @@ export const expenseLogTable = pgTable('finance_expense_log', {
 
 export type ExpenseLog = typeof expenseLogTable.$inferSelect
 export type InsertExpenseLog = typeof expenseLogTable.$inferInsert
+
+// ─── Pluggy Open Finance Items ───────────────────────────────────────────────
+
+export const pluggyItemsTable = pgTable('finance_pluggy_items', {
+  id: text('id').primaryKey(),
+  connector_id: integer('connector_id'),
+  connector_name: text('connector_name').notNull(),
+  status: text('status').notNull().default('UPDATED'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  last_sync_at: timestamp('last_sync_at', { withTimezone: true }),
+})
+
+export type PluggyItem = typeof pluggyItemsTable.$inferSelect
+export type InsertPluggyItem = typeof pluggyItemsTable.$inferInsert
+
+// ─── Pluggy Open Finance Transactions ────────────────────────────────────────
+
+export const pluggyTransactionsTable = pgTable('finance_pluggy_transactions', {
+  id: text('id').primaryKey(),
+  item_id: text('item_id').references(() => pluggyItemsTable.id, { onDelete: 'cascade' }),
+  account_id: text('account_id').notNull(),
+  description: text('description').notNull(),
+  amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
+  date: timestamp('date', { withTimezone: true }).notNull(),
+  type: text('type').notNull(),
+  category: text('category'),
+  created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
+})
+
+export type PluggyTransaction = typeof pluggyTransactionsTable.$inferSelect
+export type InsertPluggyTransaction = typeof pluggyTransactionsTable.$inferInsert
+

@@ -8,6 +8,7 @@ import { MonthSwitcher } from './month-switcher'
 import { RevenuesPanel } from './revenues-panel'
 import { SummaryCards } from './summary-cards'
 import { TrendChart } from './trend-chart'
+import { PluggyPanel } from './pluggy-panel'
 
 export function Dashboard() {
   const { loading, resetToSeed } = useFinance()
@@ -71,6 +72,7 @@ export function Dashboard() {
       ) : (
         <main className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-6 sm:px-6">
           <SummaryCards />
+          <PluggyPanel />
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="flex flex-col gap-4 lg:col-span-2">
