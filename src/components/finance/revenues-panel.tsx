@@ -30,8 +30,8 @@ export function RevenuesPanel() {
     <Card className="gap-4 p-5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-primary/15 text-primary">
-            <TrendingUp className="size-4" />
+          <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-500 text-white shadow-xs">
+            <TrendingUp className="size-4 stroke-[2.5]" />
           </span>
           <div>
             <h2 className="text-sm font-medium">Receitas</h2>

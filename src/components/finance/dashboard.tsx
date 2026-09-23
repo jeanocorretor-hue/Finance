@@ -9,6 +9,7 @@ import { RevenuesPanel } from './revenues-panel'
 import { SummaryCards } from './summary-cards'
 import { TrendChart } from './trend-chart'
 import { PluggyPanel } from './pluggy-panel'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 export function Dashboard() {
   const { loading, resetToSeed } = useFinance()
@@ -31,7 +32,7 @@ export function Dashboard() {
           <div className="flex items-center gap-2.5">
             <span
               aria-hidden
-              className="flex size-9 items-center justify-center rounded-xl bg-primary font-mono text-lg font-bold text-primary-foreground"
+              className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 font-mono text-lg font-bold text-white shadow-xs shadow-emerald-500/20"
             >
               F
             </span>
@@ -60,6 +61,7 @@ export function Dashboard() {
               </span>
             </Button>
             <MonthSwitcher />
+            <ThemeToggle />
           </div>
         </div>
       </header>

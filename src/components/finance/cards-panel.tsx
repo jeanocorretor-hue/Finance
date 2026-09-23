@@ -57,8 +57,8 @@ export function CardsPanel() {
     <Card className="gap-4 p-5">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-chart-5/15 text-chart-5">
-            <CreditCard className="size-4" />
+          <span className="flex size-8 items-center justify-center rounded-lg bg-violet-600 text-white shadow-xs">
+            <CreditCard className="size-4 stroke-[2.5]" />
           </span>
           <div>
             <h2 className="text-sm font-medium">Formas de pagamento</h2>

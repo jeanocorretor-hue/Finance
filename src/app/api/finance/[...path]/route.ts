@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, asc, lte, gt, count } from 'drizzle-orm';
 import {
   db,
   cardsTable,
@@ -13,9 +13,13 @@ import {
 } from '@/db';
 import {
   createPluggyConnectToken,
-  fetchPluggyAccounts,
-  fetchPluggyTransactions,
+  sincronizarPluggyItem,
 } from '@/lib/pluggy';
+import {
+  classificarTransacaoComJev,
+  classificarLoteTransacoesComJev,
+  encontrarMatchDespesaComJev,
+} from '@/lib/typesafe';
 
 function uid(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -101,7 +105,9 @@ async function handleGet(subPath: string[]) {
 
   if (endpoint === 'pluggy/token') {
     try {
-      const connectToken = await createPluggyConnectToken();
+      const connectToken = await createPluggyConnectToken({
+        clientUserId: 'finance-personal-user',
+      });
       return NextResponse.json({ connectToken });
     } catch (err: any) {
       return NextResponse.json({ error: err.message }, { status: 500 });
@@ -110,11 +116,44 @@ async function handleGet(subPath: string[]) {
 
   if (endpoint === 'pluggy/status') {
     const items = await db.select().from(pluggyItemsTable);
-    const recentTransactions = await db.select().from(pluggyTransactionsTable).limit(50);
+    const now = new Date();
+
+    // Extrato realizado (até o momento presente) em ordem cronológica decrescente
+    const recentTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(lte(pluggyTransactionsTable.date, now))
+      .orderBy(desc(pluggyTransactionsTable.date))
+      .limit(100);
+
+    // Parcelamentos futuros do cartão de crédito ordenados do mais próximo para o mais distante
+    const futureTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(gt(pluggyTransactionsTable.date, now))
+      .orderBy(asc(pluggyTransactionsTable.date))
+      .limit(50);
+
+    // Pendentes de conciliação (apenas movimentações já ocorridas)
+    const pendingTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(and(eq(pluggyTransactionsTable.status, 'pending'), lte(pluggyTransactionsTable.date, now)))
+      .orderBy(desc(pluggyTransactionsTable.date))
+      .limit(50);
+
+    const [txCountRes] = await db
+      .select({ val: count() })
+      .from(pluggyTransactionsTable);
+    const totalTransactions = Number(txCountRes?.val ?? 0);
+
     return NextResponse.json({
       configured: !!(process.env.PLUGGY_CLIENT_ID && process.env.PLUGGY_CLIENT_SECRET),
       items,
+      totalTransactions,
       recentTransactions,
+      futureTransactions,
+      pendingTransactions,
     });
   }
 
@@ -125,95 +164,422 @@ async function handlePost(subPath: string[], req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const pathStr = subPath.join('/');
 
+  // onSuccess do widget -> salva item e sincroniza imediatamente
   if (pathStr === 'pluggy/item') {
     const { itemId, connectorName, connectorId } = body;
     if (!itemId) {
       return NextResponse.json({ error: 'itemId é obrigatório' }, { status: 400 });
     }
 
-    await db
-      .insert(pluggyItemsTable)
-      .values({
-        id: itemId,
-        connector_id: connectorId || null,
-        connector_name: connectorName || 'Banco Conectado',
-        status: 'UPDATED',
-        last_sync_at: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: pluggyItemsTable.id,
-        set: {
-          connector_name: connectorName || 'Banco Conectado',
-          last_sync_at: new Date(),
-          status: 'UPDATED',
-        },
-      });
-
     try {
-      const accounts = await fetchPluggyAccounts(itemId);
-      for (const acc of accounts) {
-        const transactions = await fetchPluggyTransactions(acc.id);
-        for (const tx of transactions) {
-          await db
-            .insert(pluggyTransactionsTable)
-            .values({
-              id: tx.id,
-              item_id: itemId,
-              account_id: acc.id,
-              description: tx.description || 'Transação sem descrição',
-              amount: String(Math.abs(tx.amount || 0)),
-              date: new Date(tx.date),
-              type: tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT'),
-              category: tx.category || 'Outros',
-            })
-            .onConflictDoNothing();
+      const result = await sincronizarPluggyItem(itemId);
+
+      // Upsert do item com saldo e nome reais
+      const totalBalanceStr = String(result.totalBalance || 0);
+      // Nome do banco: pega da primeira conta não-credit ou o nome do conector
+      const realBankName =
+        result.accounts.find((a) => a.account_type !== 'CREDIT')?.account_name ||
+        connectorName ||
+        result.connectorName;
+
+      await db
+        .insert(pluggyItemsTable)
+        .values({
+          id: itemId,
+          connector_id: connectorId || null,
+          connector_name: realBankName,
+          status: 'UPDATED',
+          balance: totalBalanceStr,
+          last_sync_at: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: pluggyItemsTable.id,
+          set: {
+            connector_name: realBankName,
+            balance: totalBalanceStr,
+            last_sync_at: new Date(),
+            status: 'UPDATED',
+          },
+        });
+
+      // Upsert das transações com dedup por pluggy_transaction_id
+      let importadas = 0;
+      for (const tx of result.transactions) {
+        const existing = await db
+          .select({ id: pluggyTransactionsTable.id })
+          .from(pluggyTransactionsTable)
+          .where(eq(pluggyTransactionsTable.id, tx.pluggy_transaction_id))
+          .limit(1);
+
+        if (existing.length === 0) {
+          await db.insert(pluggyTransactionsTable).values({
+            id: tx.pluggy_transaction_id,
+            item_id: itemId,
+            account_id: tx.account_id,
+            account_name: tx.account_name,
+            account_type: tx.account_type,
+            description: tx.description,
+            amount: String(tx.amount),
+            date: new Date(tx.date),
+            type: tx.type,
+            category: tx.category,
+            status: 'pending',
+          }).onConflictDoNothing();
+          importadas++;
         }
       }
-    } catch (e) {
-      console.error('Erro ao sincronizar transações iniciais:', e);
-    }
 
-    return NextResponse.json({ ok: true, itemId });
+      return NextResponse.json({
+        ok: true,
+        itemId,
+        connectorName: realBankName,
+        totalBalance: result.totalBalance,
+        accounts: result.accounts,
+        contasCount: result.contasCount,
+        transacoesImportadas: importadas,
+      });
+    } catch (err: any) {
+      console.error('Erro ao sincronizar item:', err);
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
   }
 
+  // Sincronização manual (botão "Sincronizar Bancos")
   if (pathStr === 'pluggy/sync') {
     const items = await db.select().from(pluggyItemsTable);
-    let totalSynced = 0;
+    let totalImportadas = 0;
 
     for (const item of items) {
       try {
-        const accounts = await fetchPluggyAccounts(item.id);
-        for (const acc of accounts) {
-          const transactions = await fetchPluggyTransactions(acc.id);
-          for (const tx of transactions) {
-            await db
-              .insert(pluggyTransactionsTable)
-              .values({
-                id: tx.id,
-                item_id: item.id,
-                account_id: acc.id,
-                description: tx.description || 'Transação sem descrição',
-                amount: String(Math.abs(tx.amount || 0)),
-                date: new Date(tx.date),
-                type: tx.type || (tx.amount < 0 ? 'DEBIT' : 'CREDIT'),
-                category: tx.category || 'Outros',
-              })
-              .onConflictDoNothing();
-            totalSynced++;
-          }
+        const result = await sincronizarPluggyItem(item.id);
+
+        for (const tx of result.transactions) {
+          await db
+            .insert(pluggyTransactionsTable)
+            .values({
+              id: tx.pluggy_transaction_id,
+              item_id: item.id,
+              account_id: tx.account_id,
+              account_name: tx.account_name,
+              account_type: tx.account_type,
+              description: tx.description,
+              amount: String(tx.amount),
+              date: new Date(tx.date),
+              type: tx.type,
+              category: tx.category,
+              status: 'pending',
+            })
+            .onConflictDoNothing();
+          totalImportadas++;
         }
+
         await db
           .update(pluggyItemsTable)
           .set({ last_sync_at: new Date(), status: 'UPDATED' })
           .where(eq(pluggyItemsTable.id, item.id));
       } catch (err) {
-        console.error(`Erro ao sincronizar item ${item.id}:`, err);
+        console.error(`Erro sync item ${item.id}:`, err);
+        await db
+          .update(pluggyItemsTable)
+          .set({ status: 'ERROR' })
+          .where(eq(pluggyItemsTable.id, item.id));
       }
     }
 
     const updatedItems = await db.select().from(pluggyItemsTable);
-    const recentTransactions = await db.select().from(pluggyTransactionsTable).limit(50);
-    return NextResponse.json({ ok: true, totalSynced, items: updatedItems, recentTransactions });
+    const now = new Date();
+    const recentTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(lte(pluggyTransactionsTable.date, now))
+      .orderBy(desc(pluggyTransactionsTable.date))
+      .limit(100);
+    const futureTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(gt(pluggyTransactionsTable.date, now))
+      .orderBy(asc(pluggyTransactionsTable.date))
+      .limit(50);
+    const pendingTransactions = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(and(eq(pluggyTransactionsTable.status, 'pending'), lte(pluggyTransactionsTable.date, now)))
+      .orderBy(desc(pluggyTransactionsTable.date))
+      .limit(50);
+
+    return NextResponse.json({
+      ok: true,
+      totalImportadas,
+      items: updatedItems,
+      recentTransactions,
+      futureTransactions,
+      pendingTransactions,
+    });
+  }
+
+  // Marcar transação como vinculada a uma despesa
+  if (pathStr === 'pluggy/link-expense') {
+    const { transactionId, expenseId, mesRef } = body;
+    if (!transactionId || !expenseId || !mesRef) {
+      return NextResponse.json({ error: 'transactionId, expenseId e mesRef são obrigatórios' }, { status: 400 });
+    }
+
+    // Busca a transação
+    const [tx] = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(eq(pluggyTransactionsTable.id, transactionId))
+      .limit(1);
+
+    if (!tx) return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 });
+
+    // Dá baixa na despesa (upsert no monthState)
+    await db
+      .insert(monthStateTable)
+      .values({
+        expense_id: expenseId,
+        mes_ref: mesRef,
+        valor_real: tx.amount,
+        pago: true,
+        pago_em: tx.date,
+      })
+      .onConflictDoUpdate({
+        target: [monthStateTable.expense_id, monthStateTable.mes_ref],
+        set: {
+          valor_real: tx.amount,
+          pago: true,
+          pago_em: tx.date,
+        },
+      });
+
+    // Marca a transação como vinculada
+    await db
+      .update(pluggyTransactionsTable)
+      .set({ status: 'linked', expense_id: expenseId })
+      .where(eq(pluggyTransactionsTable.id, transactionId));
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // Ignorar transação (ex: transferência entre contas próprias)
+  if (pathStr === 'pluggy/ignore') {
+    const { transactionId } = body;
+    if (!transactionId) return NextResponse.json({ error: 'transactionId obrigatório' }, { status: 400 });
+    await db
+      .update(pluggyTransactionsTable)
+      .set({ status: 'ignored' })
+      .where(eq(pluggyTransactionsTable.id, transactionId));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Classificação Inteligente com Jev (TypeSafe AI)
+  if (pathStr === 'pluggy/ai-classify') {
+    const { transactionId, classifyAll, limit = 15 } = body;
+
+    try {
+      if (transactionId) {
+        const [tx] = await db
+          .select()
+          .from(pluggyTransactionsTable)
+          .where(eq(pluggyTransactionsTable.id, transactionId))
+          .limit(1);
+
+        if (!tx) {
+          return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 });
+        }
+
+        const resultado = await classificarTransacaoComJev({
+          descricao: tx.description,
+          valor: tx.amount,
+          tipo: tx.type,
+          contaNome: tx.account_name || undefined,
+          categoriaAtual: tx.category,
+        });
+
+        const newStatus = resultado.ehTransferencia
+          ? 'transfer'
+          : resultado.sugestaoAcao === 'aprovar_automatico'
+          ? 'linked'
+          : tx.status;
+
+        await db
+          .update(pluggyTransactionsTable)
+          .set({
+            category: resultado.categoria,
+            status: newStatus,
+          })
+          .where(eq(pluggyTransactionsTable.id, transactionId));
+
+        return NextResponse.json({ ok: true, resultado });
+      }
+
+      if (classifyAll) {
+        const pendentes = await db
+          .select()
+          .from(pluggyTransactionsTable)
+          .where(eq(pluggyTransactionsTable.status, 'pending'))
+          .orderBy(desc(pluggyTransactionsTable.date))
+          .limit(Math.min(limit, 30));
+
+        if (pendentes.length === 0) {
+          return NextResponse.json({ ok: true, processadas: 0, mensagem: 'Nenhuma transação pendente' });
+        }
+
+        const resultadosLote = await classificarLoteTransacoesComJev(pendentes);
+
+        let atualizadas = 0;
+        let autoAprovadas = 0;
+        let transferencias = 0;
+
+        for (const item of resultadosLote) {
+          if (!item.resultado) continue;
+          const { resultado, id } = item;
+
+          let newStatus = 'pending';
+          if (resultado.ehTransferencia) {
+            newStatus = 'transfer';
+            transferencias++;
+          } else if (resultado.sugestaoAcao === 'aprovar_automatico') {
+            newStatus = 'linked';
+            autoAprovadas++;
+          }
+
+          await db
+            .update(pluggyTransactionsTable)
+            .set({
+              category: resultado.categoria,
+              status: newStatus,
+            })
+            .where(eq(pluggyTransactionsTable.id, id));
+
+          atualizadas++;
+        }
+
+        return NextResponse.json({
+          ok: true,
+          processadas: atualizadas,
+          autoAprovadas,
+          transferencias,
+          resultados: resultadosLote,
+        });
+      }
+
+      return NextResponse.json({ error: 'Parâmetro inválido' }, { status: 400 });
+    } catch (err: any) {
+      console.error('Erro na classificação Jev:', err);
+      return NextResponse.json({ error: err.message }, { status: 500 });
+    }
+  }
+
+  // Aprovar transação e vincular categoria
+  if (pathStr === 'pluggy/approve') {
+    const { transactionId, category } = body;
+    if (!transactionId) {
+      return NextResponse.json({ error: 'transactionId obrigatório' }, { status: 400 });
+    }
+
+    await db
+      .update(pluggyTransactionsTable)
+      .set({
+        status: 'linked',
+        ...(category ? { category } : {}),
+      })
+      .where(eq(pluggyTransactionsTable.id, transactionId));
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // Buscar correspondência com despesas cadastradas via IA Jev
+  if (pathStr === 'pluggy/match-expense') {
+    const { transactionId } = body;
+    if (!transactionId) {
+      return NextResponse.json({ error: 'transactionId obrigatório' }, { status: 400 });
+    }
+
+    const [tx] = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(eq(pluggyTransactionsTable.id, transactionId))
+      .limit(1);
+
+    if (!tx) {
+      return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 });
+    }
+
+    const despesas = await db
+      .select({
+        id: expensesTable.id,
+        nome: expensesTable.nome,
+        valor_base: expensesTable.valor_base,
+        categoria: expensesTable.categoria,
+      })
+      .from(expensesTable)
+      .where(eq(expensesTable.ativo, true));
+
+    const match = await encontrarMatchDespesaComJev({
+      descricao: tx.description,
+      valor: tx.amount,
+      despesas,
+    });
+
+    return NextResponse.json({ ok: true, match });
+  }
+
+  // Conciliar transação do extrato com uma despesa e dar baixa no mês
+  if (pathStr === 'pluggy/reconcile') {
+    const { transactionId, expenseId, mesRef } = body;
+    if (!transactionId || !expenseId) {
+      return NextResponse.json({ error: 'transactionId e expenseId são obrigatórios' }, { status: 400 });
+    }
+
+    const [tx] = await db
+      .select()
+      .from(pluggyTransactionsTable)
+      .where(eq(pluggyTransactionsTable.id, transactionId))
+      .limit(1);
+
+    if (!tx) {
+      return NextResponse.json({ error: 'Transação não encontrada' }, { status: 404 });
+    }
+
+    // Calcula o mes_ref (YYYY-MM) se não enviado
+    const mes = mesRef || new Date(tx.date).toISOString().slice(0, 7);
+
+    // Marca a despesa como paga em monthStateTable
+    const existing = await db
+      .select()
+      .from(monthStateTable)
+      .where(and(eq(monthStateTable.expense_id, expenseId), eq(monthStateTable.mes_ref, mes)));
+
+    if (existing.length > 0) {
+      await db
+        .update(monthStateTable)
+        .set({
+          pago: true,
+          valor_real: String(tx.amount),
+          pago_em: new Date(tx.date),
+        })
+        .where(eq(monthStateTable.id, existing[0].id));
+    } else {
+      await db.insert(monthStateTable).values({
+        expense_id: expenseId,
+        mes_ref: mes,
+        pago: true,
+        valor_real: String(tx.amount),
+        pago_em: new Date(tx.date),
+      });
+    }
+
+    // Vincula a transação no extrato
+    await db
+      .update(pluggyTransactionsTable)
+      .set({
+        status: 'linked',
+        expense_id: expenseId,
+      })
+      .where(eq(pluggyTransactionsTable.id, transactionId));
+
+    return NextResponse.json({ ok: true, message: 'Despesa baixada e conciliada com sucesso' });
   }
 
   if (pathStr === 'reset-seed' || pathStr === 'reset') {

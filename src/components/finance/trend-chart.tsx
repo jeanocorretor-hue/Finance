@@ -66,13 +66,13 @@ export function TrendChart() {
           <h2 className="text-sm font-medium">Receita x Despesa</h2>
           <p className="text-xs text-muted-foreground">Série mensal projetada (12 meses)</p>
         </div>
-        <div className="flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-primary" />
+        <div className="flex items-center gap-4 text-xs font-semibold">
+          <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+            <span className="size-2.5 rounded-full bg-emerald-500 shadow-xs" />
             Receita
           </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-destructive" />
+          <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+            <span className="size-2.5 rounded-full bg-rose-500 shadow-xs" />
             Despesa
           </span>
         </div>
@@ -82,12 +82,12 @@ export function TrendChart() {
           <AreaChart data={trend} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="fillReceita" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.35} />
-                <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
+                <stop offset="5%" stopColor="#10b981" stopOpacity={0.45} />
+                <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
               </linearGradient>
               <linearGradient id="fillDespesa" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-destructive)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--color-destructive)" stopOpacity={0} />
+                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="#ef4444" stopOpacity={0.02} />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="3 3" />
@@ -109,13 +109,13 @@ export function TrendChart() {
             <Tooltip content={<ChartTooltip />} cursor={{ stroke: 'var(--color-border)', strokeWidth: 1 }} />
             <ReferenceLine
               x={month}
-              stroke="var(--color-foreground)"
-              strokeOpacity={0.35}
+              stroke="#64748b"
+              strokeOpacity={0.5}
               strokeDasharray="4 4"
-              label={{ value: currentLabel, position: 'top', fill: 'var(--color-muted-foreground)', fontSize: 10 }}
+              label={{ value: currentLabel, position: 'top', fill: '#64748b', fontSize: 10 }}
             />
-            <Area type="monotone" dataKey="total_receita" stroke="var(--color-primary)" strokeWidth={2} fill="url(#fillReceita)" />
-            <Area type="monotone" dataKey="total_despesa" stroke="var(--color-destructive)" strokeWidth={2} fill="url(#fillDespesa)" />
+            <Area type="monotone" dataKey="total_receita" stroke="#10b981" strokeWidth={2.5} fill="url(#fillReceita)" />
+            <Area type="monotone" dataKey="total_despesa" stroke="#ef4444" strokeWidth={2.5} fill="url(#fillDespesa)" />
           </AreaChart>
         </ResponsiveContainer>
       </div>

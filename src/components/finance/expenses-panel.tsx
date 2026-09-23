@@ -46,8 +46,8 @@ export function ExpensesPanel() {
     <Card className="gap-4 p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex size-8 items-center justify-center rounded-lg bg-destructive/15 text-destructive">
-            <Receipt className="size-4" />
+          <span className="flex size-8 items-center justify-center rounded-lg bg-rose-500 text-white shadow-xs">
+            <Receipt className="size-4 stroke-[2.5]" />
           </span>
           <div>
             <h2 className="text-sm font-medium">Despesas</h2>

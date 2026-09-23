@@ -168,6 +168,7 @@ interface FinanceContextValue {
   updateCard: (id: string, draft: CardDraft) => void
   deleteCard: (id: string) => void
   resetToSeed: () => void
+  reload: () => Promise<void>
 }
 
 const FinanceContext = createContext<FinanceContextValue | null>(null)
@@ -192,20 +193,26 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // ── Load all data from API on mount ───────────────────────────────────────
-  useEffect(() => {
-    apiFetch<Record<string, unknown[]>>('/data')
-      .then((data) => {
-        setCards((data.cards as Record<string, unknown>[]).map(normalizeCard))
-        setExpensesRaw((data.expenses as Record<string, unknown>[]).map(normalizeExpense))
-        setRevenuesRaw((data.revenues as Record<string, unknown>[]).map(normalizeRevenue))
-        setMonthState_((data.monthState as Record<string, unknown>[]).map(normalizeMonthState))
-        setRevenueState((data.revenueState as Record<string, unknown>[]).map(normalizeRevenueState))
-        setExpenseLog((data.expenseLog as Record<string, unknown>[]).map(normalizeLogEntry))
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
+  // ── Load all data from API ───────────────────────────────────────
+  const reload = useCallback(async () => {
+    try {
+      const data = await apiFetch<Record<string, unknown[]>>('/data')
+      setCards((data.cards as Record<string, unknown>[]).map(normalizeCard))
+      setExpensesRaw((data.expenses as Record<string, unknown>[]).map(normalizeExpense))
+      setRevenuesRaw((data.revenues as Record<string, unknown>[]).map(normalizeRevenue))
+      setMonthState_((data.monthState as Record<string, unknown>[]).map(normalizeMonthState))
+      setRevenueState((data.revenueState as Record<string, unknown>[]).map(normalizeRevenueState))
+      setExpenseLog((data.expenseLog as Record<string, unknown>[]).map(normalizeLogEntry))
+    } catch (err) {
+      console.error('Erro ao recarregar dados do Finance:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
 
   // ── Derived views ─────────────────────────────────────────────────────────
   const dataset: FinanceDataset = useMemo(
@@ -458,6 +465,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     addRevenue, updateRevenue, deleteRevenue,
     addCard, updateCard, deleteCard,
     resetToSeed,
+    reload,
   }
 
   return <FinanceContext.Provider value={value}>{children}</FinanceContext.Provider>

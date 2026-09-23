@@ -114,6 +114,9 @@ export const pluggyItemsTable = pgTable('finance_pluggy_items', {
   connector_id: integer('connector_id'),
   connector_name: text('connector_name').notNull(),
   status: text('status').notNull().default('UPDATED'),
+  account_type: text('account_type').default('BANK'),
+  balance: numeric('balance', { precision: 12, scale: 2 }).default('0'),
+  balance_currency: text('balance_currency').default('BRL'),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
   last_sync_at: timestamp('last_sync_at', { withTimezone: true }),
 })
@@ -127,14 +130,21 @@ export const pluggyTransactionsTable = pgTable('finance_pluggy_transactions', {
   id: text('id').primaryKey(),
   item_id: text('item_id').references(() => pluggyItemsTable.id, { onDelete: 'cascade' }),
   account_id: text('account_id').notNull(),
+  account_name: text('account_name'),
+  account_type: text('account_type'),
   description: text('description').notNull(),
   amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
   date: timestamp('date', { withTimezone: true }).notNull(),
-  type: text('type').notNull(),
+  type: text('type').notNull(), // DEBIT | CREDIT
   category: text('category'),
+  // Conciliação: se já foi vinculado a uma despesa ou receita
+  status: text('status').default('pending'), // pending | linked | ignored | transfer
+  expense_id: text('expense_id').references(() => expensesTable.id, { onDelete: 'set null' }),
+  revenue_id: text('revenue_id').references(() => revenuesTable.id, { onDelete: 'set null' }),
   created_at: timestamp('created_at', { withTimezone: true }).defaultNow(),
 })
 
 export type PluggyTransaction = typeof pluggyTransactionsTable.$inferSelect
 export type InsertPluggyTransaction = typeof pluggyTransactionsTable.$inferInsert
+
 
